@@ -1,11 +1,11 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-const char* ssid = "MR.ROBOT";
-const char* password = "8894869371";
+const char* ssid = "wifiname";
+const char* password = "yourwifipass";
 const char* mqttServer = "public.mqtthq.com";
 const int mqttPort = 1883;
-const char* mqttTopic = "mqttHQ-client-nielit";
+const char* mqttTopic = "mqttHQ-client-topicname";
 const int qos = 0;
 
 WiFiServer server(80);
