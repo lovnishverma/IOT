@@ -2,13 +2,13 @@
 #include <PubSubClient.h>
 #include <ESP8266WebServer.h>
 
-const char* ssid = "jassi5";
-const char* password = "jassi1234";
+const char* ssid = "yourssid";
+const char* password = "yourpass";
 const char* mqttServer = "broker.hivemq.com";
 const int mqttPort = 1883;
-const char* mqttTopic = "mytopic/nielit";
+const char* mqttTopic = "mytopic/topicname";
 const int qos = 0;
-const char* clientId = "clientId-rYrhxeZq98";
+const char* clientId = "clientId-tempcid001";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
