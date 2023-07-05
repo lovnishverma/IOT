@@ -1,0 +1,158 @@
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = "wifiname";
+const char* password = "wifipass";
+const char* mqttServer = "broker.hivemq.com";
+const int mqttPort = 1883;
+const char* mqttTopic = "room/xyz";
+const int qos = 0;
+const char* clientId = "clientId-xyz";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+char lastMessage[5] = ""; // Variable to store the last received message
+bool relay1State = true; // Initial state of relay 1 is turned on
+bool relay2State = true; // Initial state of relay 2 is turned on
+
+const int buzzerPin = 5; // Use GPIO 5 for the buzzer (D1)
+const int relay1Pin = 4; // Use GPIO 4 for relay 1 control (D2)
+const int relay2Pin = 14; // Use GPIO 14 for relay 2 control (D5)
+
+ESP8266WebServer server(80);
+
+void beep() {
+  digitalWrite(buzzerPin, HIGH); // Turn on the buzzer
+  delay(100); // Wait for a short duration (adjust as needed)
+  digitalWrite(buzzerPin, LOW); // Turn off the buzzer
+}
+
+void callback(char* topic, byte* payload, unsigned int length);
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.println("Connecting to MQTT...");
+    if (client.connect(clientId)) {
+      Serial.println("Connected to MQTT");
+      client.subscribe(mqttTopic, qos);
+
+      // Clear retained message on MQTT broker
+      client.publish(mqttTopic, "", true);
+
+      // Publish initial relay states
+      client.publish(mqttTopic, "11", true);
+    } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Retrying in 2 seconds...");
+      delay(2000);
+    }
+  }
+}
+
+void handleRoot() {
+  String html = "<html><body><h1>NIELIT LEDs MQTT Toggle Switch- By Sarwan Singh</h1>";
+  html += "<p>Switch 1 State: " + String(relay1State ? "ON" : "OFF") + "</p>";
+  html += "<p>Switch 2 State: " + String(relay2State ? "ON" : "OFF") + "</p>";
+  html += "<p><a href=\"/toggle1\">Toggle Switch 1</a></p>";
+  html += "<p><a href=\"/toggle2\">Toggle Switch 2</a></p>";
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}
+
+void handleToggle1() {
+  relay1State = !relay1State;
+  digitalWrite(relay1Pin, relay1State ? HIGH : LOW);
+  beep();
+
+  String statePayload = relay1State ? "1" : "0";
+  client.publish(mqttTopic, statePayload.c_str(), true);
+
+  server.sendHeader("Location", String("/"), true);
+  server.send(302, "text/plain", "");
+}
+
+void handleToggle2() {
+  relay2State = !relay2State;
+  digitalWrite(relay2Pin, relay2State ? HIGH : LOW);
+  beep();
+
+  String statePayload = relay2State ? "11" : "00";
+  client.publish(mqttTopic, statePayload.c_str(), true);
+
+  server.sendHeader("Location", String("/"), true);
+  server.send(302, "text/plain", "");
+}
+
+void setup() {
+  pinMode(buzzerPin, OUTPUT); // Set buzzer pin as an output
+
+  pinMode(relay1Pin, OUTPUT); // Set relay 1 pin as an output
+  digitalWrite(relay1Pin, relay1State ? HIGH : LOW); // Initialize relay 1 state
+
+  pinMode(relay2Pin, OUTPUT); // Set relay 2 pin as an output
+  digitalWrite(relay2Pin, relay2State ? HIGH : LOW); // Initialize relay 2 state
+
+  Serial.begin(115200);
+  delay(10);
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi...");
+  }
+
+  Serial.println("Connected to WiFi");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+
+  while (!client.connected()) {
+    reconnect();
+  }
+
+  server.on("/", handleRoot);
+  server.on("/toggle1", handleToggle1);
+  server.on("/toggle2", handleToggle2);
+
+  server.begin();
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+  server.handleClient();
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("Message received: ");
+  Serial.print((char*)payload);
+
+  if (length == 1 && payload[0] != lastMessage[0]) {
+    if (payload[0] == '0') {
+      relay1State = false; // Set relay 1 state OFF
+      beep(); // Emit a beep
+    } else if (payload[0] == '1') {
+      relay1State = true; // Set relay 1 state ON
+      beep(); // Emit a beep
+    } else if (strcmp((char*)payload, "11") == 0) {
+      relay2State = true; // Set relay 2 state ON
+      beep(); // Emit a beep
+    } else if (strcmp((char*)payload, "00") == 0) {
+      relay2State = false; // Set relay 2 state OFF
+      beep(); // Emit a beep
+    }
+
+    digitalWrite(relay1Pin, relay1State ? HIGH : LOW); // Update relay 1 state
+    digitalWrite(relay2Pin, relay2State ? HIGH : LOW); // Update relay 2 state
+
+    strncpy(lastMessage, (char*)payload, sizeof(lastMessage));
+  }
+}
