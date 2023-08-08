@@ -1,0 +1,49 @@
+const int pirPin = 5;    // PIR sensor pin (GPIO 5 / D1)
+const int relayPin = 4;  // Relay module pin (GPIO 4 / D2)
+
+unsigned long lastMotionTime = 0;
+const unsigned long motionDebounceTime = 2000; // Motion debounce time in milliseconds
+
+bool lightsActivated = false;
+
+void setup() {
+  pinMode(pirPin, INPUT);
+  pinMode(relayPin, OUTPUT);
+  
+  digitalWrite(relayPin, LOW); // Initialize relay to off state
+  
+  Serial.begin(9600);
+  Serial.println("Office Bathroom Lights Control");
+}
+
+void loop() {
+  int pirState = digitalRead(pirPin);
+
+  if (pirState == HIGH) {
+    if (!lightsActivated) {
+      lightsActivated = true;
+      Serial.println("Motion detected! Turning on lights.");
+      activateLights();
+    }
+    lastMotionTime = millis();
+  } else {
+    if (millis() - lastMotionTime >= motionDebounceTime && lightsActivated) {
+      lightsActivated = false;
+      deactivateLights();
+    }
+  }
+}
+
+void activateLights() {
+  digitalWrite(relayPin, LOW); // Turn off the relay
+  Serial.println("Lights Activated.");
+
+  delay(60000); // Keep lights on for 60 seconds (1 minute)
+
+  deactivateLights();
+}
+
+void deactivateLights() {
+  digitalWrite(relayPin, HIGH);  // Turn on the relay
+  Serial.println("No motion detected. Lights Dectivated.");
+}
