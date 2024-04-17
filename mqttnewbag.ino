@@ -2,10 +2,9 @@
 #include <PubSubClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <ArduinoJson.h>
 
-const char* ssid = "Meet131";
-const char* password = "8699453054@056";
+const char* ssid = "PrinceLV84";
+const char* password = "8894869371";
 const char* mqttServer = "broker.hivemq.com";
 const int mqttPort = 1883;
 const char* mqttTopic = "mytopic/bag";
@@ -15,37 +14,46 @@ const char* clientId = "clientId-karsog";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-char lastMessage[2] = "";
-bool relayState = true;
-bool localSwitchState = true;
+char lastMessage[2] = ""; // Variable to store the last received message
+bool relayState = true; // Initial state of the relay is turned on
+bool localSwitchState = true; // Initial state of the local switch is turned on
 
-const int buzzerPin = 5;
-const int relayPin = 4;
+const int buzzerPin = 5; // Use GPIO 5 for the buzzer (D1)
+const int relayPin = 4; // Use GPIO 4 for the relay control (D2)
 
 ESP8266WebServer server(80);
 
 void beep() {
-  digitalWrite(buzzerPin, HIGH);
-  delay(100);
-  digitalWrite(buzzerPin, LOW);
+  digitalWrite(buzzerPin, HIGH); // Turn on the buzzer
+  delay(100); // Wait for a short duration (adjust as needed)
+  digitalWrite(buzzerPin, LOW); // Turn off the buzzer
 }
 
 void callback(char* topic, byte* payload, unsigned int length);
 
 void reconnect() {
   while (!client.connected()) {
+    Serial.println("Connecting to MQTT...");
     if (client.connect(clientId)) {
+      Serial.println("Connected to MQTT");
       client.subscribe(mqttTopic, qos);
+
+      // Clear retained message on MQTT broker
       client.publish(mqttTopic, "", true);
-      client.publish(mqttTopic, "1", true);
+
+      // Publish initial relay state as ON
+      client.publish(mqttTopic, "0", true);
     } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" Retrying in 2 seconds...");
       delay(2000);
     }
   }
 }
 
 void handleRoot() {
-  String html = "<html><body><h1>Lovnish's MQTT Toggle Switch</h1>";
+  String html = "<html><body><h1>Lovnish LEDs MQTT Toggle Switch</h1>";
   html += "<p>Relay State: " + String(relayState ? "ON" : "OFF") + "</p>";
   html += "<p><a href=\"/toggle\">Toggle Relay</a></p>";
   html += "</body></html>";
@@ -58,7 +66,7 @@ void handleToggle() {
   digitalWrite(relayPin, relayState ? HIGH : LOW);
   beep();
 
-  String statePayload = relayState ? "1" : "0";
+  String statePayload = relayState ? "0" : "1";
   client.publish(mqttTopic, statePayload.c_str(), true);
 
   server.sendHeader("Location", String("/"), true);
@@ -66,28 +74,43 @@ void handleToggle() {
 }
 
 void setup() {
-  pinMode(buzzerPin, OUTPUT);
-  pinMode(relayPin, OUTPUT);
-  digitalWrite(relayPin, relayState ? HIGH : LOW);
+  pinMode(buzzerPin, OUTPUT); // Set buzzer pin as an output
+  pinMode(relayPin, OUTPUT); // Set relay pin as an output
+
+  digitalWrite(relayPin, LOW); // Initialize relay state to OFF
+
   Serial.begin(115200);
   delay(10);
+
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
+    Serial.println("Connecting to WiFi...");
   }
+
+  Serial.println("Connected to WiFi");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  MDNS.begin("lv");
+  Serial.println("mDNS responder started");
+
+  server.on("/", handleRoot);
+  server.on("/toggle", handleToggle);
+
+  server.begin();
+
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback);
+
   while (!client.connected()) {
     reconnect();
   }
-  MDNS.begin("lovnish");
-  server.on("/", handleRoot);
-  server.on("/toggle", handleToggle);
-  server.begin();
 }
 
 void loop() {
   MDNS.update();
+  
   if (!client.connected()) {
     reconnect();
   }
@@ -96,17 +119,18 @@ void loop() {
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  StaticJsonDocument<200> doc;
-  DeserializationError error = deserializeJson(doc, payload, length);
-  if (!error && doc.containsKey("command")) {
-    const char* command = doc["command"];
-    if (strcmp(command, "0") == 0) {
-      relayState = false;
-      beep();
-    } else if (strcmp(command, "1") == 0) {
-      relayState = true;
-      beep();
+  Serial.println("Message received: ");
+  Serial.print((char*)payload);
+
+  if (length == 1) {
+    if (payload[0] == '0') {
+      relayState = true; // Set relay state OFF
+      beep(); // Emit a beep
+    } else if (payload[0] == '1') {
+      relayState = false; // Set relay state ON
+      beep(); // Emit a beep
     }
-    digitalWrite(relayPin, relayState ? HIGH : LOW);
+
+    digitalWrite(relayPin, relayState ? HIGH : LOW); // Update relay state
   }
 }
