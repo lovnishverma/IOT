@@ -1,0 +1,54 @@
+const int PIR_PIN = 5;
+const int RELAY_PIN = 4;
+const int BUZZER_PIN = 3;
+
+const unsigned long MOTION_DEBOUNCE_TIME = 2000;
+const unsigned long LIGHTS_ON_DURATION = 60000;
+
+unsigned long lastMotionTime = 0;
+bool lightsActivated = false;
+
+void setup() {
+  pinMode(PIR_PIN, INPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+
+void loop() {
+  int pirState = digitalRead(PIR_PIN);
+
+  if (pirState == HIGH) {
+    lastMotionTime = millis();
+    
+    if (!lightsActivated) {
+      lightsActivated = true;
+      activateLights();
+      activateBuzzer(1000);
+    }
+  } else {
+    if (lightsActivated && (millis() - lastMotionTime >= MOTION_DEBOUNCE_TIME)) {
+      if (millis() - lastMotionTime >= LIGHTS_ON_DURATION) {
+        lightsActivated = false;
+        deactivateLights();
+        activateBuzzer(2000);
+      }
+    }
+  }
+}
+
+void activateLights() {
+  digitalWrite(RELAY_PIN, HIGH);
+}
+
+void deactivateLights() {
+  digitalWrite(RELAY_PIN, LOW);
+}
+
+void activateBuzzer(int frequency) {
+  tone(BUZZER_PIN, frequency);
+  delay(200);
+  noTone(BUZZER_PIN);
+} 
