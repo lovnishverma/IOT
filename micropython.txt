@@ -1,0 +1,129 @@
+import network
+import time
+from machine import Pin
+from umqtt.simple import MQTTClient
+import socket
+
+# Wi-Fi Configuration
+SSID = "PrinceLV84"
+PASSWORD = "8894869371"
+
+# MQTT Configuration
+MQTT_SERVER = "broker.hivemq.com"
+MQTT_PORT = 1883
+MQTT_TOPIC = "mytopic/bag"
+CLIENT_ID = "clientId-karsog"
+QOS = 0
+
+# Pin Configuration
+buzzer = Pin(5, Pin.OUT)  # GPIO 5 for the buzzer (D1)
+relay = Pin(4, Pin.OUT)  # GPIO 4 for relay control (D2)
+relay.off()  # Initial relay state OFF
+
+# Global Variables
+relay_state = True  # Relay initially ON
+last_message = ""
+
+
+# Function to connect to Wi-Fi
+def connect_wifi():
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        print("Connecting to Wi-Fi...")
+        wlan.connect(SSID, PASSWORD)
+        while not wlan.isconnected():
+            time.sleep(1)
+    print("Connected to Wi-Fi:", wlan.ifconfig())
+
+
+# Beep function for the buzzer
+def beep():
+    buzzer.on()
+    time.sleep(0.1)
+    buzzer.off()
+
+
+# MQTT message callback
+def mqtt_callback(topic, msg):
+    global relay_state
+    print("Message received:", msg.decode())
+    
+    if msg == b'0':
+        relay_state = True
+        relay.on()  # Turn relay ON
+        beep()
+    elif msg == b'1':
+        relay_state = False
+        relay.off()  # Turn relay OFF
+        beep()
+
+
+# Setup the MQTT client
+client = MQTTClient(CLIENT_ID, MQTT_SERVER, MQTT_PORT)
+client.set_callback(mqtt_callback)
+
+
+# Function to reconnect to MQTT
+def reconnect_mqtt():
+    while True:
+        try:
+            print("Connecting to MQTT...")
+            client.connect()
+            client.subscribe(MQTT_TOPIC, qos=QOS)
+            print("Connected to MQTT and subscribed to topic:", MQTT_TOPIC)
+            return
+        except Exception as e:
+            print("MQTT connection failed. Retrying in 2 seconds...")
+            time.sleep(2)
+
+
+# Handle HTTP requests (very basic web server)
+def start_web_server():
+    addr = socket.getaddrinfo("0.0.0.0", 80)[0][-1]
+    s = socket.socket()
+    s.bind(addr)
+    s.listen(1)
+    print("Web server started on port 80")
+    
+    while True:
+        cl, addr = s.accept()
+        print("Client connected from", addr)
+        request = cl.recv(1024).decode()
+        
+        if "/toggle" in request:
+            toggle_relay()
+        
+        response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"
+        response += "<html><body><h1>Lovnish LEDs MQTT Toggle Switch</h1>"
+        response += f"<p>Relay State: {'ON' if relay_state else 'OFF'}</p>"
+        response += '<p><a href="/toggle">Toggle Relay</a></p></body></html>'
+        
+        cl.send(response)
+        cl.close()
+
+
+# Function to toggle the relay state
+def toggle_relay():
+    global relay_state
+    relay_state = not relay_state
+    relay.value(relay_state)
+    beep()
+    state_payload = b'0' if relay_state else b'1'
+    client.publish(MQTT_TOPIC, state_payload, qos=QOS)
+    print(f"Relay toggled to {'ON' if relay_state else 'OFF'}")
+
+
+# Main function
+def main():
+    connect_wifi()
+    reconnect_mqtt()
+    
+    try:
+        start_web_server()
+    except KeyboardInterrupt:
+        print("Stopping web server...")
+
+
+# Run the main function
+main()
