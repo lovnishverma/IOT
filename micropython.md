@@ -71,5 +71,3 @@ To upload this **MicroPython** code to your **ESP8266**, follow these steps:
    - The web server is accessible at `http://<ESP8266-IP>`.
 
 ---
-
-Let me know if you want to use a specific IDE, and I can guide you with detailed steps!
