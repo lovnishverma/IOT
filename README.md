@@ -88,8 +88,4 @@ _TBD: Please upload Fritzing diagrams for clarity._
 ## ⚠️ Disclaimer
 For educational purposes only. Do not use for production or critical infrastructure without proper security audits.
 
-
 ---
-
-
- 
