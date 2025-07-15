@@ -2,7 +2,7 @@ name: CI Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ esp8266 ]
 
 jobs:
   build:
