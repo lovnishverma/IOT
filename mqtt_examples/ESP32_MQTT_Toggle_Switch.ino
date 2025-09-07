@@ -17,7 +17,7 @@
  * - Send "1" to turn relay ON
  * - Send "0" to turn relay OFF
  * 
- * Author: ESP32 MQTT Controller
+ * Author: Lovnish Verma
  * Version: 1.0
  */
 
